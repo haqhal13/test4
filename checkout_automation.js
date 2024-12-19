@@ -7,56 +7,49 @@ app.get('/automate', async (req, res) => {
     let browser = null;
 
     try {
-        console.log("Launching Puppeteer...");
+        console.log("Starting Puppeteer...");
         browser = await puppeteer.launch({
             headless: true,
-            executablePath: '/usr/bin/google-chrome',
+            executablePath: '/usr/bin/google-chrome', // Path to Chrome on Render
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-extensions',
                 '--disable-gpu',
             ],
         });
 
         const page = await browser.newPage();
-
-        // Step 1: Go to the product page
         const productURL = "https://5fbqad-qz.myshopify.com/products/gift-service";
-        console.log(`Navigating to: ${productURL}`);
+        console.log(`Navigating to product page: ${productURL}`);
 
         await page.goto(productURL, {
             waitUntil: 'networkidle2',
-            timeout: 60000, // Increased timeout
+            timeout: 60000,
         });
 
-        // Step 2: Handle Privacy Popup
+        console.log("Checking for privacy popup...");
         const privacySelector = 'button#shopify-pc__banner__btn-accept';
         if (await page.$(privacySelector)) {
-            console.log("Dismissing Privacy Popup...");
+            console.log("Clicking privacy popup...");
             await page.click(privacySelector);
-            await page.waitForTimeout(1000); // Small delay
+            await page.waitForTimeout(1000);
         }
 
-        // Step 3: Click "Buy it now"
+        console.log("Looking for 'Buy it now' button...");
         const buyNowSelector = 'button.shopify-payment-button__button--unbranded';
-        console.log("Clicking 'Buy it now' button...");
         await page.waitForSelector(buyNowSelector, { visible: true, timeout: 60000 });
+        console.log("Clicking 'Buy it now' button...");
         await page.click(buyNowSelector);
 
-        // Step 4: Wait for the Checkout Page
         console.log("Waiting for checkout page...");
         await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 });
-
         const checkoutURL = page.url();
-        console.log(`Checkout URL fetched: ${checkoutURL}`);
 
-        // Respond with the Checkout URL
+        console.log(`Checkout URL: ${checkoutURL}`);
         res.json({ success: true, checkoutURL });
-
     } catch (error) {
-        console.error("Error during automation:", error.message);
+        console.error("Automation error:", error.message);
         res.status(500).json({ success: false, error: error.message });
     } finally {
         if (browser) {
