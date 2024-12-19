@@ -4,12 +4,18 @@ const puppeteer = require('puppeteer-core');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Root route to confirm the server is running
+app.get('/', (req, res) => {
+  res.send('Server is up and running! Use /automate to trigger the automation.');
+});
+
+// Automation route
 app.get('/automate', async (req, res) => {
   try {
     console.log("Launching Puppeteer...");
     const browser = await puppeteer.launch({
-      headless: true,
-      executablePath: '/usr/bin/google-chrome', // Google Chrome for Puppeteer
+      headless: true, // Run without a browser window
+      executablePath: '/usr/bin/google-chrome', // Path to Google Chrome in Docker
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
@@ -49,6 +55,7 @@ app.get('/automate', async (req, res) => {
   }
 });
 
+// Start the Express server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
