@@ -1,61 +1,71 @@
-const express = require('express');
 const puppeteer = require('puppeteer-core');
-
+const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Root route to confirm the server is running
 app.get('/', (req, res) => {
-  res.send('Server is up and running! Use /automate to trigger the automation.');
+  res.send("Server is up and running! Use /automate to trigger the automation.");
 });
 
-// Automation route
 app.get('/automate', async (req, res) => {
+  res.json({ success: true, message: "Automation started..." });
+  console.log("Automation started...");
+
+  const productURL = "https://5fbqad-qz.myshopify.com/products/gift-service";
+
   try {
-    console.log("Launching Puppeteer...");
     const browser = await puppeteer.launch({
-      headless: true, // Run without a browser window
-      executablePath: '/usr/bin/google-chrome', // Path to Google Chrome in Docker
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      headless: true, // Run in headless mode for speed
+      executablePath: '/usr/bin/google-chrome', // Adjust path for your environment
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-extensions'
+      ],
     });
 
     const page = await browser.newPage();
-
-    // Step 1: Go to the product page
-    const productURL = "https://5fbqad-qz.myshopify.com/products/gift-service";
     console.log("Navigating to product page...");
-    await page.goto(productURL, { waitUntil: 'networkidle2' });
 
-    // Step 2: Dismiss the privacy policy popup if it exists
-    const privacySelector = 'button#shopify-pc__banner__btn-accept';
-    if (await page.$(privacySelector)) {
-      console.log("Dismissing Privacy Policy popup...");
-      await page.click(privacySelector);
+    // Step 1: Navigate to the product page
+    await page.goto(productURL, { 
+      waitUntil: 'domcontentloaded', 
+      timeout: 60000 // Increased timeout to 60 seconds
+    });
+
+    // Step 2: Accept privacy popup if it exists
+    const privacyAcceptSelector = 'button#shopify-pc__banner__btn-accept';
+    if (await page.$(privacyAcceptSelector)) {
+      console.log("Dismissing privacy popup...");
+      await page.click(privacyAcceptSelector);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Pause to ensure interaction
     }
 
     // Step 3: Click "Buy it now" button
     const buyNowSelector = 'button.shopify-payment-button__button--unbranded';
     console.log("Clicking 'Buy it now' button...");
-    await page.waitForSelector(buyNowSelector, { visible: true });
+    await page.waitForSelector(buyNowSelector, { timeout: 10000 });
     await page.click(buyNowSelector);
 
     // Step 4: Wait for the checkout page to load
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
-    const checkoutURL = page.url();
-    console.log("Checkout page loaded:", checkoutURL);
+    console.log("Waiting for checkout page...");
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // Close the browser
+    // Get the checkout page URL
+    const checkoutURL = page.url();
+    console.log("Checkout URL:", checkoutURL);
+
     await browser.close();
 
-    // Respond with the checkout URL
+    // Send the checkout URL as a response
     res.json({ success: true, checkoutURL });
   } catch (error) {
-    console.error("Error occurred:", error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error("Error during automation:", error);
+    res.json({ success: false, error: "An error occurred during automation." });
   }
 });
 
-// Start the Express server
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}. Access it at http://localhost:${PORT}`);
 });
