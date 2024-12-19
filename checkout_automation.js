@@ -1,5 +1,6 @@
 const express = require('express');
 const puppeteer = require('puppeteer-core');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -10,7 +11,7 @@ app.get('/automate', async (req, res) => {
         console.log("Starting Puppeteer...");
         browser = await puppeteer.launch({
             headless: true,
-            executablePath: '/usr/bin/google-chrome', // Path to Chrome on Render
+            executablePath: '/usr/bin/google-chrome-stable', // Ensure path is correct
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -25,7 +26,7 @@ app.get('/automate', async (req, res) => {
 
         await page.goto(productURL, {
             waitUntil: 'networkidle2',
-            timeout: 60000,
+            timeout: 120000, // Increased timeout
         });
 
         console.log("Checking for privacy popup...");
@@ -43,13 +44,16 @@ app.get('/automate', async (req, res) => {
         await page.click(buyNowSelector);
 
         console.log("Waiting for checkout page...");
-        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 });
-        const checkoutURL = page.url();
+        await page.waitForNavigation({
+            waitUntil: 'networkidle2',
+            timeout: 120000, // Ensure longer timeout
+        });
 
-        console.log(`Checkout URL: ${checkoutURL}`);
+        const checkoutURL = page.url();
+        console.log(`Checkout URL fetched: ${checkoutURL}`);
         res.json({ success: true, checkoutURL });
     } catch (error) {
-        console.error("Automation error:", error.message);
+        console.error("Error:", error.message);
         res.status(500).json({ success: false, error: error.message });
     } finally {
         if (browser) {
