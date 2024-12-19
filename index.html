@@ -1,75 +1,50 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Processing...</title>
-    <style>
-        body {
-            background-color: #ffffff;
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            flex-direction: column;
-        }
-        h1 {
-            margin-bottom: 20px;
-            color: #333;
-        }
-        #progress-container {
-            width: 80%;
-            height: 30px;
-            background-color: #f3f3f3;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-        #progress-bar {
-            height: 100%;
-            width: 0;
-            background-color: #4caf50;
-            transition: width 0.5s ease-in-out;
-        }
-        #progress-text {
-            font-size: 18px;
-            color: #333;
-        }
-    </style>
-</head>
-<body>
-    <h1>Processing... Please wait</h1>
-    <div id="progress-container">
-        <div id="progress-bar"></div>
-    </div>
-    <div id="progress-text">0%</div>
+const express = require('express');
+const puppeteer = require('puppeteer-core');
 
-    <script>
-        let progress = 0;
-        const progressBar = document.getElementById('progress-bar');
-        const progressText = document.getElementById('progress-text');
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-        function simulateProgress() {
-            if (progress < 100) {
-                progress += Math.floor(Math.random() * 5) + 1;
-                if (progress > 100) progress = 100;
-                progressBar.style.width = progress + '%';
-                progressText.textContent = progress + '%';
-                setTimeout(simulateProgress, 200);
-            } else {
-                redirectToCheckout();
-            }
-        }
+app.get('/automate', async (req, res) => {
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      executablePath: '/usr/bin/google-chrome', // Use Render's default Chrome path
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
 
-        function redirectToCheckout() {
-            const checkoutUrl = "https://5fbqad-qz.myshopify.com/cart/9925411930458:1?payment=shop_pay";
-            window.location.href = checkoutUrl;
-        }
+    const page = await browser.newPage();
 
-        simulateProgress();
-    </script>
-</body>
-</html>
+    // Step 1: Go to the product page
+    const productURL = "https://5fbqad-qz.myshopify.com/products/gift-service";
+    await page.goto(productURL, { waitUntil: 'networkidle2' });
+
+    // Step 2: Handle Privacy Popup
+    const privacySelector = 'button#shopify-pc__banner__btn-accept';
+    if (await page.$(privacySelector)) {
+      console.log("Dismissing Privacy Popup...");
+      await page.click(privacySelector);
+    }
+
+    // Step 3: Click "Buy it now"
+    const buyNowSelector = 'button.shopify-payment-button__button--unbranded';
+    await page.waitForSelector(buyNowSelector, { visible: true });
+    await page.click(buyNowSelector);
+
+    // Step 4: Wait for Checkout Page
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+    const checkoutURL = page.url();
+
+    // Close Browser
+    await browser.close();
+
+    // Respond with Checkout URL
+    res.json({ message: 'Success!', checkoutURL });
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).send("An error occurred");
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
