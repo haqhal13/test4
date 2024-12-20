@@ -1,8 +1,14 @@
-# Use a lightweight Node.js image
-FROM node:18-slim
+# Use Node.js base image
+FROM node:18
+
+# Install Google Chrome and necessary dependencies
+RUN apt-get update && apt-get install -y wget gnupg \
+    && wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+    && dpkg -i google-chrome-stable_current_amd64.deb || apt-get install -fy \
+    && rm google-chrome-stable_current_amd64.deb
 
 # Set the working directory
-WORKDIR /usr/src/app
+WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json ./
@@ -10,18 +16,11 @@ COPY package.json package-lock.json ./
 # Install dependencies
 RUN npm install
 
-# Install Google Chrome (for Puppeteer)
-RUN apt-get update && apt-get install -y wget gnupg2 ca-certificates \
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update && apt-get install -y google-chrome-stable --no-install-recommends \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Copy the script files
+# Copy application source code
 COPY . .
 
-# Expose the port
+# Expose the port used by Express
 EXPOSE 3000
 
-# Run the app
+# Start the application
 CMD ["node", "checkout_automation.js"]
