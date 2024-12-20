@@ -3,66 +3,53 @@ const puppeteer = require('puppeteer-core');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const CHROME_EXECUTABLE_PATH = process.env.CHROME_EXECUTABLE_PATH || '/usr/bin/google-chrome';
+const PRODUCT_URL = process.env.PRODUCT_URL || "https://5fbqad-qz.myshopify.com/products/gift-service";
 
 app.get('/automate', async (req, res) => {
-    let browser = null;
+  try {
+    console.log("Launching Puppeteer...");
+    const browser = await puppeteer.launch({
+      headless: true,
+      executablePath: CHROME_EXECUTABLE_PATH, // Use environment variable or default path
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
 
-    try {
-        console.log("Starting Puppeteer...");
-        browser = await puppeteer.launch({
-            headless: true,
-            executablePath: '/usr/bin/google-chrome-stable', // Ensure path is correct
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-            ],
-        });
+    const page = await browser.newPage();
 
-        const page = await browser.newPage();
-        const productURL = "https://5fbqad-qz.myshopify.com/products/gift-service";
-        console.log(`Navigating to product page: ${productURL}`);
+    // Step 1: Go to the product page
+    console.log(`Navigating to product page: ${PRODUCT_URL}`);
+    await page.goto(PRODUCT_URL, { waitUntil: 'networkidle2' });
 
-        await page.goto(productURL, {
-            waitUntil: 'networkidle2',
-            timeout: 120000, // Increased timeout
-        });
-
-        console.log("Checking for privacy popup...");
-        const privacySelector = 'button#shopify-pc__banner__btn-accept';
-        if (await page.$(privacySelector)) {
-            console.log("Clicking privacy popup...");
-            await page.click(privacySelector);
-            await page.waitForTimeout(1000);
-        }
-
-        console.log("Looking for 'Buy it now' button...");
-        const buyNowSelector = 'button.shopify-payment-button__button--unbranded';
-        await page.waitForSelector(buyNowSelector, { visible: true, timeout: 60000 });
-        console.log("Clicking 'Buy it now' button...");
-        await page.click(buyNowSelector);
-
-        console.log("Waiting for checkout page...");
-        await page.waitForNavigation({
-            waitUntil: 'networkidle2',
-            timeout: 120000, // Ensure longer timeout
-        });
-
-        const checkoutURL = page.url();
-        console.log(`Checkout URL fetched: ${checkoutURL}`);
-        res.json({ success: true, checkoutURL });
-    } catch (error) {
-        console.error("Error:", error.message);
-        res.status(500).json({ success: false, error: error.message });
-    } finally {
-        if (browser) {
-            await browser.close();
-            console.log("Browser closed.");
-        }
+    // Step 2: Dismiss the privacy policy popup if it exists
+    const privacySelector = 'button#shopify-pc__banner__btn-accept';
+    if (await page.$(privacySelector)) {
+      console.log("Dismissing Privacy Policy popup...");
+      await page.click(privacySelector);
     }
+
+    // Step 3: Click "Buy it now" button
+    const buyNowSelector = 'button.shopify-payment-button__button--unbranded';
+    console.log("Clicking 'Buy it now' button...");
+    await page.waitForSelector(buyNowSelector, { visible: true });
+    await page.click(buyNowSelector);
+
+    // Step 4: Wait for the checkout page to load
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+    const checkoutURL = page.url();
+    console.log("Checkout page loaded:", checkoutURL);
+
+    // Close the browser
+    await browser.close();
+
+    // Respond with the checkout URL
+    res.json({ success: true, checkoutURL });
+  } catch (error) {
+    console.error("Error occurred:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
